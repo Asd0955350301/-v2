@@ -58,6 +58,14 @@
     details { max-width: 620px; margin: 20px auto; padding: 14px 18px; border-radius: 16px; background: #eef8f5; text-align: left; color: var(--muted); line-height: 1.55; }
     summary { color: var(--navy); font-weight: 850; cursor: pointer; }
     details p { margin: 12px 0 0; }
+    .player-form { max-width: 520px; margin: 24px auto 0; padding: 18px; border: 2px solid #c8e4dc; border-radius: 20px; background: #f1faf6; text-align: left; }
+    .player-form label { display: block; margin-bottom: 7px; color: var(--green-dark); font-weight: 900; }
+    .player-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+    .player-input { width: 100%; min-height: 52px; padding: 12px 15px; border: 2px solid #9ccbc0; border-radius: 14px; background: white; color: var(--ink); font: inherit; font-size: 1rem; transition: border-color .18s, box-shadow .18s; }
+    .player-input:focus { border-color: var(--green); outline: 0; box-shadow: 0 0 0 4px #45a9862d; }
+    .player-input[aria-invalid="true"] { border-color: var(--coral); box-shadow: 0 0 0 4px #d8584324; }
+    .form-message { min-height: 1.35em; margin: 8px 2px 0; color: #923d30; font-size: .88rem; font-weight: 750; }
+    .privacy-note { margin: 8px 2px 0; color: var(--muted); font-size: .8rem; line-height: 1.45; }
     .button { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 13px 22px; border-radius: 15px; background: var(--navy); color: white; text-decoration: none; font-weight: 900; box-shadow: 0 7px 0 #0b3544; transition: transform .18s, box-shadow .18s, background .18s; }
     .button:hover { background: #0d5f79; transform: translateY(-2px); box-shadow: 0 9px 0 #0b3544; }
     .button:active { transform: translateY(5px); box-shadow: 0 2px 0 #0b3544; }
@@ -163,6 +171,11 @@
     .final-score-card { display: grid; place-items: center; width: clamp(150px, 28vw, 190px); aspect-ratio: 1; margin: 18px auto 22px; border: 9px solid white; border-radius: 50%; background: linear-gradient(145deg, #dff9ed, #d9f0fb); color: var(--navy); box-shadow: 0 13px 30px #24586735, inset 0 0 0 3px #4da486; }
     .final-score-card strong { display: block; font-size: clamp(2.6rem, 8vw, 4.3rem); line-height: .9; letter-spacing: -.06em; }
     .final-score-card span { display: block; margin-top: 9px; color: var(--green-dark); font-size: .78rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .player-result { margin: -5px 0 12px; color: var(--green-dark); font-weight: 900; font-size: 1.15rem; }
+    .save-status { max-width: 560px; min-height: 48px; margin: 16px auto 22px; padding: 12px 15px; border-radius: 14px; background: #eef7f5; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+    .save-status.success { background: #e4f8ec; color: #176044; }
+    .save-status.error { background: #fff0eb; color: #82382d; }
+    .retry-save { margin: -10px auto 22px; }
     .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 680px; margin: 28px auto; text-align: left; }
     .summary { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #f4faf8; }
     .summary strong { display: block; margin-bottom: 5px; color: var(--green-dark); }
@@ -189,6 +202,8 @@
       .brand { margin-left: 4px; font-size: .9rem; }
       .rule-strip { grid-template-columns: 1fr; }
       .rule + .rule { border-left: 0; border-top: 2px solid var(--line); }
+      .player-row { grid-template-columns: 1fr; }
+      .player-row .button { width: 100%; }
       .game-header { grid-template-columns: 1fr; gap: 10px; }
       .game-header .button { position: absolute; top: 11px; right: 12px; }
       .game-meta { padding-right: 86px; display: block; }
@@ -230,7 +245,15 @@
         <summary>How to play</summary>
         <p>Drag each card directly to Earth or Trash. You get one answer for each card, so choose carefully. Correct answers add one point.</p>
       </details>
-      <button id="start-button" class="button" type="button">Start Game <span aria-hidden="true">→</span></button>
+      <form id="player-form" class="player-form" novalidate>
+        <label for="player-name">Player name</label>
+        <div class="player-row">
+          <input id="player-name" class="player-input" name="playerName" type="text" maxlength="80" autocomplete="name" placeholder="Enter your name" required>
+          <button id="start-button" class="button" type="submit">Start Game <span aria-hidden="true">→</span></button>
+        </div>
+        <p id="name-error" class="form-message" role="alert" aria-live="polite"></p>
+        <p class="privacy-note">Your name and final score will be sent to the teacher's Google Sheet.</p>
+      </form>
       <p class="fine-print">Simple English · 10 questions · One point for each correct answer</p>
     </section>
 
@@ -288,10 +311,13 @@
       <div class="celebration" aria-hidden="true">🌍✨</div>
       <p class="eyebrow">10 of 10 facts completed</p>
       <h1 id="complete-title" tabindex="-1">You are an<br>Air Guardian!</h1>
+      <p id="player-result" class="player-result"></p>
       <div class="final-score-card" aria-label="Final score">
         <div><strong id="final-score-number">0 / 10</strong><span>Final score</span></div>
       </div>
       <p id="result-score" class="lead"></p>
+      <div id="save-status" class="save-status" role="status" aria-live="polite">Preparing your score…</div>
+      <button id="retry-save" class="button secondary small retry-save" type="button" hidden>Send Score Again</button>
       <div class="summary-grid">
         <div class="summary"><strong>🍂 Know the season</strong>Fall and winter conditions can let pollution build up.</div>
         <div class="summary"><strong>🫁 Protect your lungs</strong>Fine particles can travel deep into the lungs.</div>
@@ -306,10 +332,13 @@
       <p class="fine-print">Official Ministry of Environment links open in a new tab. This game provides general health education, not medical advice.</p>
     </section>
   </main>
+  <iframe id="score-submit-frame" name="score-submit-frame" title="Score submission" hidden></iframe>
   <noscript><p style="margin:2rem;padding:1rem;background:white">This game needs JavaScript. Please enable it and reload the page.</p></noscript>
 
   <script>
     'use strict';
+    // Replace this value with the /exec URL from your deployed Google Apps Script.
+    const SCORE_API_URL = 'https://script.google.com/macros/s/AKfycbxI4oHCutr2k-EKnUHIYBF2Ye3kue0jzPIhz4wJEhn022_z4hlhtfExW6c6FFcxK4-wtw/exec';
     const QUESTIONS = [
       { id: 1, topic: 'Taiwan: regional differences', statement: 'Air pollution levels can differ across Taiwan because of local traffic, industry, geography, weather, and pollution carried from other areas.', correctTarget: 'earth', hint: 'Think about whether every place has the same roads, factories, landscape, and wind.', explanation: 'Air quality is not the same everywhere. Local emissions, terrain, weather, and transported pollution all matter.' },
       { id: 2, topic: 'Taiwan: seasonal differences', statement: 'Air pollution is always the same in every season in Taiwan.', correctTarget: 'trash', hint: 'Weather and wind change with the seasons.', explanation: 'Air quality changes by season. Fall and winter often bring conditions that allow pollution to build up.' },
@@ -323,13 +352,14 @@
       { id: 10, topic: 'Understanding AQI', statement: 'You must memorize the concentration of every pollutant before AQI can help you.', correctTarget: 'trash', hint: 'AQI was created to simplify complex pollution data.', explanation: 'AQI turns pollutant measurements into simple colors, numbers, health-risk levels, and activity advice.' }
     ];
 
-    const state = { screen: 'welcome', currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, drag: null, timers: [] };
+    const state = { screen: 'welcome', playerName: '', sessionId: '', currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, drag: null, timers: [] };
     const $ = (id) => document.getElementById(id);
     const els = {
       welcome: $('welcome'), game: $('game'), complete: $('complete'), count: $('question-count'), score: $('score-count'),
       progress: $('progress'), topic: $('topic'), text: $('question-text'), card: $('question-card'), body: $('game-body'),
       earth: $('earth-target'), trash: $('trash-target'), earthIcon: $('earth-icon'), feedback: $('feedback'), next: $('next-button'),
-      scene: $('scene-row'), resultScore: $('result-score')
+      scene: $('scene-row'), resultScore: $('result-score'), playerName: $('player-name'), nameError: $('name-error'),
+      playerResult: $('player-result'), saveStatus: $('save-status'), retrySave: $('retry-save')
     };
 
     function clearTimers() { state.timers.forEach(clearTimeout); state.timers = []; }
@@ -366,10 +396,28 @@
         [QUESTIONS[index], QUESTIONS[randomIndex]] = [QUESTIONS[randomIndex], QUESTIONS[index]];
       }
     }
+    function makeSessionId() {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+      return `game-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    function beginGame(event) {
+      event.preventDefault();
+      const name = els.playerName.value.trim().replace(/\s+/g, ' ');
+      if (!name) {
+        els.playerName.setAttribute('aria-invalid', 'true');
+        els.nameError.textContent = 'Enter your name before starting the game.';
+        els.playerName.focus();
+        return;
+      }
+      els.playerName.removeAttribute('aria-invalid');
+      els.nameError.textContent = '';
+      state.playerName = name;
+      startGame();
+    }
     function startGame() {
       clearTimers();
       shuffleQuestions();
-      Object.assign(state, { currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, drag: null });
+      Object.assign(state, { sessionId: makeSessionId(), currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, drag: null });
       showScreen('game'); renderQuestion(); els.card.focus();
     }
     function renderQuestion() {
@@ -420,11 +468,55 @@
         state.currentIndex += 1; renderQuestion(); els.card.focus();
       } else renderComplete();
     }
+    function saveScore() {
+      if (state.scoreSubmitted) return;
+      els.retrySave.hidden = true;
+
+      if (!SCORE_API_URL.startsWith('https://script.google.com/macros/s/') || !SCORE_API_URL.endsWith('/exec')) {
+        els.saveStatus.className = 'save-status error';
+        els.saveStatus.textContent = 'Score recording is not connected yet. Add the Google Apps Script /exec URL in index.html.';
+        return;
+      }
+
+      els.saveStatus.className = 'save-status';
+      els.saveStatus.textContent = 'Sending your score to the teacher…';
+      const payload = {
+        name: state.playerName,
+        score: String(state.score),
+        total: String(QUESTIONS.length),
+        wrong: String(QUESTIONS.length - state.score),
+        sessionId: state.sessionId
+      };
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = SCORE_API_URL;
+      form.target = 'score-submit-frame';
+      form.hidden = true;
+
+      Object.entries(payload).forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
+      state.scoreSubmitted = true;
+      later(() => {
+        els.saveStatus.className = 'save-status success';
+        els.saveStatus.textContent = '✓ Score submitted. Check the Scores tab in the teacher’s Google Sheet.';
+      }, 1200);
+    }
     function renderComplete() {
       clearTimers(); showScreen('complete');
       const message = state.score >= 8 ? 'Excellent work!' : state.score >= 6 ? 'Good job!' : 'Keep learning and try again!';
       $('final-score-number').textContent = `${state.score} / ${QUESTIONS.length}`;
+      els.playerResult.textContent = state.playerName;
       els.resultScore.textContent = message;
+      saveScore();
       $('complete-title').focus();
     }
 
@@ -461,9 +553,14 @@
       if (event.key === 'ArrowRight') { event.preventDefault(); submitAnswer('trash'); }
     }
 
-    $('start-button').addEventListener('click', startGame);
+    $('player-form').addEventListener('submit', beginGame);
+    els.playerName.addEventListener('input', () => {
+      els.playerName.removeAttribute('aria-invalid');
+      els.nameError.textContent = '';
+    });
     $('restart-top').addEventListener('click', startGame);
     $('play-again').addEventListener('click', startGame);
+    els.retrySave.addEventListener('click', saveScore);
     els.next.addEventListener('click', nextQuestion);
     [els.earth, els.trash].forEach(target => target.addEventListener('click', () => submitAnswer(target.dataset.target)));
     els.card.addEventListener('pointerdown', onPointerDown);
