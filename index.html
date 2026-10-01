@@ -246,9 +246,9 @@
         <p>Drag each card directly to Earth or Trash. You get one answer for each card, so choose carefully. Correct answers add one point.</p>
       </details>
       <form id="player-form" class="player-form" novalidate>
-        <label for="player-name">Player name</label>
+        <label for="player-name">Player name / 名稱</label>
         <div class="player-row">
-          <input id="player-name" class="player-input" name="playerName" type="text" maxlength="80" autocomplete="name" placeholder="Enter your name" required>
+          <input id="player-name" class="player-input" name="playerName" type="text" maxlength="80" autocomplete="name" placeholder="Enter your name / 請輸入名稱" required>
           <button id="start-button" class="button" type="submit">Start Game <span aria-hidden="true">→</span></button>
         </div>
         <p id="name-error" class="form-message" role="alert" aria-live="polite"></p>
@@ -332,13 +332,12 @@
       <p class="fine-print">Official Ministry of Environment links open in a new tab. This game provides general health education, not medical advice.</p>
     </section>
   </main>
-  <iframe id="score-submit-frame" name="score-submit-frame" title="Score submission" hidden></iframe>
   <noscript><p style="margin:2rem;padding:1rem;background:white">This game needs JavaScript. Please enable it and reload the page.</p></noscript>
 
   <script>
     'use strict';
     // Replace this value with the /exec URL from your deployed Google Apps Script.
-    const SCORE_API_URL = 'https://script.google.com/macros/s/AKfycbxI4oHCutr2k-EKnUHIYBF2Ye3kue0jzPIhz4wJEhn022_z4hlhtfExW6c6FFcxK4-wtw/exec';
+    const SCORE_API_URL = 'https://script.google.com/macros/s/AKfycbw6A9cfKDKUQNTYuPcI-EeU12B5-LohrbBGdCXNhQ0w8LZQVzDzX8CbuvFZGi2hrinJ/exec';
     const QUESTIONS = [
       { id: 1, topic: 'Taiwan: regional differences', statement: 'Air pollution levels can differ across Taiwan because of local traffic, industry, geography, weather, and pollution carried from other areas.', correctTarget: 'earth', hint: 'Think about whether every place has the same roads, factories, landscape, and wind.', explanation: 'Air quality is not the same everywhere. Local emissions, terrain, weather, and transported pollution all matter.' },
       { id: 2, topic: 'Taiwan: seasonal differences', statement: 'Air pollution is always the same in every season in Taiwan.', correctTarget: 'trash', hint: 'Weather and wind change with the seasons.', explanation: 'Air quality changes by season. Fall and winter often bring conditions that allow pollution to build up.' },
@@ -352,7 +351,7 @@
       { id: 10, topic: 'Understanding AQI', statement: 'You must memorize the concentration of every pollutant before AQI can help you.', correctTarget: 'trash', hint: 'AQI was created to simplify complex pollution data.', explanation: 'AQI turns pollutant measurements into simple colors, numbers, health-risk levels, and activity advice.' }
     ];
 
-    const state = { screen: 'welcome', playerName: '', sessionId: '', currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, drag: null, timers: [] };
+    const state = { screen: 'welcome', playerName: '', sessionId: '', currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, scoreSaving: false, drag: null, timers: [] };
     const $ = (id) => document.getElementById(id);
     const els = {
       welcome: $('welcome'), game: $('game'), complete: $('complete'), count: $('question-count'), score: $('score-count'),
@@ -417,7 +416,7 @@
     function startGame() {
       clearTimers();
       shuffleQuestions();
-      Object.assign(state, { sessionId: makeSessionId(), currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, drag: null });
+      Object.assign(state, { sessionId: makeSessionId(), currentIndex: 0, completedCount: 0, score: 0, wrongCount: 0, isDragging: false, isAnswered: false, scoreSubmitted: false, scoreSaving: false, drag: null });
       showScreen('game'); renderQuestion(); els.card.focus();
     }
     function renderQuestion() {
@@ -468,8 +467,8 @@
         state.currentIndex += 1; renderQuestion(); els.card.focus();
       } else renderComplete();
     }
-    function saveScore() {
-      if (state.scoreSubmitted) return;
+    async function saveScore() {
+      if (state.scoreSubmitted || state.scoreSaving) return;
       els.retrySave.hidden = true;
 
       if (!SCORE_API_URL.startsWith('https://script.google.com/macros/s/') || !SCORE_API_URL.endsWith('/exec')) {
@@ -487,29 +486,38 @@
         wrong: String(QUESTIONS.length - state.score),
         sessionId: state.sessionId
       };
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = SCORE_API_URL;
-      form.target = 'score-submit-frame';
-      form.hidden = true;
-
-      Object.entries(payload).forEach(([name, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
-      form.remove();
-      state.scoreSubmitted = true;
-      later(() => {
+      const sessionId = state.sessionId;
+      state.scoreSaving = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        const response = await fetch(SCORE_API_URL, {
+          method: 'POST',
+          body: new URLSearchParams(payload),
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error('Score request failed.');
+        const result = await response.json();
+        if (result.ok !== true) throw new Error(result.message || 'Score was not saved.');
+        if (state.sessionId !== sessionId) return;
+        state.scoreSubmitted = true;
         els.saveStatus.className = 'save-status success';
-        els.saveStatus.textContent = '✓ Score submitted. Check the Scores tab in the teacher’s Google Sheet.';
-      }, 1200);
+        els.saveStatus.textContent = '✓ Score saved to the teacher’s Google Sheet.';
+      } catch (error) {
+        if (state.sessionId !== sessionId) return;
+        els.saveStatus.className = 'save-status error';
+        els.saveStatus.textContent = error.name === 'AbortError'
+          ? '儲存確認逾時，請檢查網路後重試。 / Score confirmation timed out.'
+          : error instanceof TypeError
+            ? '無法取得 Google 後端回應，請檢查網路與瀏覽器限制後重試。 / Could not reach the score recorder.'
+            : `成績登錄失敗 / Score recording failed: ${error.message}`;
+        els.retrySave.hidden = false;
+      } finally {
+        clearTimeout(timeout);
+        if (state.sessionId === sessionId) state.scoreSaving = false;
+      }
     }
+
     function renderComplete() {
       clearTimers(); showScreen('complete');
       const message = state.score >= 8 ? 'Excellent work!' : state.score >= 6 ? 'Good job!' : 'Keep learning and try again!';
